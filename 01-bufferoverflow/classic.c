@@ -5,9 +5,9 @@
 
 int vuln()
 {
-    char buf[80]; // 0x50
+    char buf[80]; // 0x50 
     int r;
-    r = read(0, buf, 400); // 0x190
+    r = read(0, buf, 400); // 0x190 // Maximum 400 octets
     printf("\nadress of buf=%p", buf);
     printf("\nRead %d bytes \nbuf contains %s\n", r, buf);
     return 0;

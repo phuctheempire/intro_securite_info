@@ -1,0 +1,169 @@
+file classic
+>> classic: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=b666bd0567a2b32cd32e74315c19c143a3a39641, for GNU/Linux 3.2.0, with debug_info, not stripped
+
+gcc -g -fno-stack-protector -z execstack classic.c -o classic
+
+Randomisation d'addressage 
+Disable ASLR: echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+
+php for execution:
+php -r 'echo str_repeat["A",32];' | ./classic
+
+or python:
+python3 -c 'print ("A"*200)' | ./classic
+
+dans la classic.c:
+buf : 80 octets
+r : 4 octets
+
+read: Kernel request 
+
+
+gdb: 
+exec:
+>> r < <(echo AAAAAAAAA)
+
+>>break* main
+create breakpoint on the first instruction of function main
+
+>> disass
+Dump of assembler code for function main:
+=> 0x00000000004011b0 <+0>:     endbr64             |
+   0x00000000004011b4 <+4>:     push   rbp          | "Bonjour"
+   0x00000000004011b5 <+5>:     mov    rbp,rsp      | 
+   0x00000000004011b8 <+8>:     sub    rsp,0x10     
+   0x00000000004011bc <+12>:    mov    DWORD PTR [rbp-0x4],edi
+   0x00000000004011bf <+15>:    mov    QWORD PTR [rbp-0x10],rsi
+   0x00000000004011c3 <+19>:    mov    edi,0x402041
+   0x00000000004011c8 <+24>:    mov    eax,0x0
+   0x00000000004011cd <+29>:    call   0x401050 <printf@plt>
+   0x00000000004011d2 <+34>:    mov    eax,0x0
+   0x00000000004011d7 <+39>:    call   0x401156 <vuln>
+   0x00000000004011dc <+44>:    mov    eax,0x0
+   0x00000000004011e1 <+49>:    leave               |
+   0x00000000004011e2 <+50>:    ret                 |Au revoir
+End of assembler dump.
+
+: push sbp -> save the base pointer
+: mov rbp, rsp -> save the stack pointer in the base pointer
+
+>> ni 
+next instruction
+gdb-peda$ disass
+Dump of assembler code for function main:
+   0x00000000004011b0 <+0>:     endbr64 
+   0x00000000004011b4 <+4>:     push   rbp
+   0x00000000004011b5 <+5>:     mov    rbp,rsp
+=> 0x00000000004011b8 <+8>:     sub    rsp,0x10
+   0x00000000004011bc <+12>:    mov    DWORD PTR [rbp-0x4],edi
+   0x00000000004011bf <+15>:    mov    QWORD PTR [rbp-0x10],rsi
+   0x00000000004011c3 <+19>:    mov    edi,0x402041
+   0x00000000004011c8 <+24>:    mov    eax,0x0
+   0x00000000004011cd <+29>:    call   0x401050 <printf@plt>
+   0x00000000004011d2 <+34>:    mov    eax,0x0
+   0x00000000004011d7 <+39>:    call   0x401156 <vuln>
+   0x00000000004011dc <+44>:    mov    eax,0x0
+   0x00000000004011e1 <+49>:    leave  
+   0x00000000004011e2 <+50>:    ret    
+End of assembler dump.
+
+gdb-peda$ i r rsp
+rsp            0x7fffffffd3a0      0x7fffffffd3a0
+gdb-peda$ i r rbp
+rbp            0x7fffffffd3a0      0x7fffffffd3a0
+
+Meme valeur
+
+gdb-peda$ x/1gx $rsp
+0x7fffffffd3a0: 0x0000000000000001
+gdb-peda$ x/1gx $rbp
+0x7fffffffd3a0: 0x0000000000000001
+
+aller dans fonction vuln
+
+using stepi ( quand on est dans la fonction vuln)
+
+gdb-peda$ disass
+Dump of assembler code for function vuln:
+=> 0x0000000000401156 <+0>:     endbr64 
+   0x000000000040115a <+4>:     push   rbp
+   0x000000000040115b <+5>:     mov    rbp,rsp
+   0x000000000040115e <+8>:     sub    rsp,0x60
+   0x0000000000401162 <+12>:    lea    rax,[rbp-0x60]
+   0x0000000000401166 <+16>:    mov    edx,0x190
+   0x000000000040116b <+21>:    mov    rsi,rax
+   0x000000000040116e <+24>:    mov    edi,0x0
+   0x0000000000401173 <+29>:    call   0x401060 <read@plt>
+   0x0000000000401178 <+34>:    mov    DWORD PTR [rbp-0x4],eax
+   0x000000000040117b <+37>:    lea    rax,[rbp-0x60]
+   0x000000000040117f <+41>:    mov    rsi,rax
+   0x0000000000401182 <+44>:    mov    edi,0x402008
+   0x0000000000401187 <+49>:    mov    eax,0x0
+   0x000000000040118c <+54>:    call   0x401050 <printf@plt>
+   0x0000000000401191 <+59>:    lea    rdx,[rbp-0x60]
+   0x0000000000401195 <+63>:    mov    eax,DWORD PTR [rbp-0x4]
+   0x0000000000401198 <+66>:    mov    esi,eax
+   0x000000000040119a <+68>:    mov    edi,0x402020
+   0x000000000040119f <+73>:    mov    eax,0x0
+   0x00000000004011a4 <+78>:    call   0x401050 <printf@plt>
+   0x00000000004011a9 <+83>:    mov    eax,0x0
+   0x00000000004011ae <+88>:    leave  
+   0x00000000004011af <+89>:    ret    
+End of assembler dump.
+
+
+gdb-peda$ x/1gx $rsp
+0x7fffffffd388: 0x00000000004011dc                            ****
+gdb-peda$ disass main
+Dump of assembler code for function main:
+   0x00000000004011b0 <+0>:     endbr64 
+   0x00000000004011b4 <+4>:     push   rbp
+   0x00000000004011b5 <+5>:     mov    rbp,rsp
+   0x00000000004011b8 <+8>:     sub    rsp,0x10
+   0x00000000004011bc <+12>:    mov    DWORD PTR [rbp-0x4],edi
+   0x00000000004011bf <+15>:    mov    QWORD PTR [rbp-0x10],rsi
+   0x00000000004011c3 <+19>:    mov    edi,0x402041
+   0x00000000004011c8 <+24>:    mov    eax,0x0
+   0x00000000004011cd <+29>:    call   0x401050 <printf@plt>
+   0x00000000004011d2 <+34>:    mov    eax,0x0
+   0x00000000004011d7 <+39>:    call   0x401156 <vuln>
+   0x00000000004011dc <+44>:    mov    eax,0x0               ****
+   0x00000000004011e1 <+49>:    leave  
+   0x00000000004011e2 <+50>:    ret    
+End of assembler dump.
+gdb-peda$ 
+
+gdb-peda$ x/1gx $rbp
+0x7fffffffd3a0: 0x0000000000000001
+
+=> 0x40115b <vuln+5>:   mov    rbp,rsp
+
+gdb-peda$ x/1gx $rbp
+0x7fffffffd380: 0x00007fffffffd3a0
+gdb-peda$ x/1gx $rsp
+0x7fffffffd380: 0x00007fffffffd3a0
+gdb-peda$ x/2gx $rbp
+0x7fffffffd380: 0x00007fffffffd3a0      0x00000000004011dc
+gdb-peda$ x/2gx $rsp
+0x7fffffffd380: 0x00007fffffffd3a0      0x00000000004011dc
+
+gdb-peda$ x/3i 0x00000000004011dc
+   0x4011dc <main+44>:  mov    eax,0x0
+   0x4011e1 <main+49>:  leave  
+   0x4011e2 <main+50>:  ret    
+
+gdb-peda$ x/1gx $rbp
+0x7fffffffd380: 0x00007fffffffd3a0
+gdb-peda$ x/14gx $rsp
+0x7fffffffd320: 0x4141414141414141 *rsp*d      0x0000000000000a41
+0x7fffffffd330: 0x0000000000000001      0x0000000000000001
+0x7fffffffd340: 0x0000000000400040      0x00007ffff7fe283c
+0x7fffffffd350: 0x00000000000006f0      0x00007fffffffd939
+0x7fffffffd360: 0x00007ffff7fc1000      0x0000010101000000
+0x7fffffffd370: 0x0000000000000000      0x0000000af7ffe2e0
+0x7fffffffd380: 0x00007fffffffd3a0 *rbp*     0x00000000004011dc
+
+
+
+
+ret == pop RIP
