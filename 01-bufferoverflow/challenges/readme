@@ -1,0 +1,4 @@
+pour lancer:
+1. even-password: cat even-pass | ./even-password
+2. weird-password: cat weird-pass | ./weird-password
+3. vuln: cat payload | ./vuln
